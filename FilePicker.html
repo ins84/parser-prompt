@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .upload-area {
+      border: 2px dashed #4285F4;
+      border-radius: 8px;
+      padding: 30px;
+      margin: 20px 0;
+      background: #f8f9fa;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .upload-area:hover {
+      background: #e8f0fe;
+      border-color: #1967D2;
+    }
+    
+    .upload-area.dragover {
+      background: #d2e3fc;
+      border-color: #1967D2;
+    }
+    
+    #fileInput {
+      display: none;
+    }
+    
+    .button {
+      background: #4285F4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    
+    .button:hover {
+      background: #1967D2;
+    }
+    
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+      min-height: 40px;
+    }
+    
+    .success {
+      color: #0f9d58;
+      font-weight: bold;
+    }
+    
+    .error {
+      color: #d93025;
+      font-weight: bold;
+    }
+    
+    .processing {
+      color: #f57c00;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h3>📂 Seleziona file dal tuo PC</h3>
+  
+  <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+    <p>🎯 Clicca qui o trascina il file</p>
+    <p style="font-size: 12px; color: #666;">Formati: .txt, .md</p>
+  </div>
+  
+  <input type="file" id="fileInput" accept=".txt,.md" />
+  
+  <div>
+    <button class="button" onclick="google.script.host.close()">❌ Chiudi</button>
+  </div>
+  
+  <div id="status">In attesa del file...</div>
+
+  <script>
+    var fileContent = null;
+    var fileName = null;
+    
+    var uploadArea = document.getElementById('uploadArea');
+    var fileInput = document.getElementById('fileInput');
+    var status = document.getElementById('status');
+    
+    // APRI AUTOMATICAMENTE IL FILE PICKER ALL'AVVIO
+    window.onload = function() {
+      setTimeout(function() {
+        fileInput.click();
+      }, 100);
+    };
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      var files = e.dataTransfer.files;
+      if (files.length > 0) {
+        handleFile(files[0]);
+      }
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', function(e) {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      } else {
+        status.innerHTML = '<span style="color: #666;">Nessun file selezionato</span>';
+      }
+    });
+    
+    function handleFile(file) {
+      fileName = file.name;
+      
+      // Verifica formato
+      if (!fileName.match(/\.(txt|md)$/i)) {
+        status.innerHTML = '<span class="error">❌ Formato non valido! Usa .txt o .md</span>';
+        return;
+      }
+      
+      status.innerHTML = '<span class="processing">📄 Caricamento: ' + fileName + '...</span>';
+      
+      var reader = new FileReader();
+      
+      reader.onload = function(e) {
+        fileContent = e.target.result;
+        status.innerHTML = '<span class="processing">⏳ Elaborazione in corso...</span>';
+        
+        // ELABORA AUTOMATICAMENTE
+        setTimeout(function() {
+          processFile();
+        }, 500);
+      };
+      
+      reader.onerror = function() {
+        status.innerHTML = '<span class="error">❌ Errore nella lettura del file</span>';
+      };
+      
+      reader.readAsText(file, 'UTF-8');
+    }
+    
+    function processFile() {
+      if (!fileContent) {
+        status.innerHTML = '<span class="error">❌ Nessun contenuto da elaborare</span>';
+        return;
+      }
+      
+      status.innerHTML = '<span class="processing">⏳ Elaborazione scene in corso...</span>';
+      
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onFailure)
+        .processMarkdownContent(fileContent, fileName);
+    }
+    
+    function onSuccess(result) {
+      if (result.success) {
+        status.innerHTML = '<span class="success">✅ Completato! Scene: ' + result.message.match(/Scene estratte: (\d+)/)[1] + '</span>';
+        setTimeout(function() {
+          alert(result.message);
+          google.script.host.close();
+        }, 1000);
+      } else {
+        status.innerHTML = '<span class="error">' + result.message.replace(/\n/g, '<br>') + '</span>';
+      }
+    }
+    
+    function onFailure(error) {
+      status.innerHTML = '<span class="error">❌ Errore: ' + error.message + '</span>';
+      console.error('Errore completo:', error);
+    }
+  </script>
+</body>
+</html>
